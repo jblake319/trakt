@@ -312,8 +312,8 @@ def main():
                       help='allow to overwrite default list, default %(default)s',
                       choices=['watchlist', 'collection', 'history'], dest='list', default='watchlist')
         parser.add_argument('-s', '--seen',
-                      help='mark as seen, default %(default)s. Use specific time if provided, falback time: "2016-01-01T00:00:00.000Z"',
-                      nargs='?', const='2016-01-01T00:00:00.000Z',
+                      help='mark as seen, default %(default)s. Use specific time if provided, no argument expects times in CSV',
+                      nargs='?', const='csv_flag',
                       action='store', type=str, dest='seen', default=False)
         parser.add_argument('-C', '--clean',
                       help='empty list prior to import, default %(default)s',
@@ -334,7 +334,7 @@ def main():
             print "Error, you can only mark seen {0} when adding into the history list".format(options.type)
             sys.exit(1)
 
-        if options.seen:
+        if options.seen and options.seen != 'csv_flag':
             try:
                 datetime.datetime.strptime(options.seen, '%Y-%m-%dT%H:%M:%S.000Z')
             except:
@@ -373,11 +373,33 @@ def main():
                     if not options.format == "imdb" and not myid[0].startswith('tt'):
                         myid[0] = int(myid[0])
                     if (options.type == "movies" or options.type == "shows") and options.seen:
-                        data.append({'ids':{options.format : myid[0]}, "watched_at": options.seen})
+                        if options.seen == 'csv_flag':
+                            try:
+                                datetime.datetime.strptime(myid[1], '%Y-%m-%dT%H:%M:%S.000Z')
+                            except:
+                                sys.exit("Error, invalid format, it's must be UTC datetime, eg: '2016-01-01T00:00:00.000Z'")
+                            data.append({
+                                'ids':{options.format : myid[0]},
+                                "watched_at": myid[1]})
+                        else:
+                            data.append({
+                                'ids':{options.format : myid[0]},
+                                "watched_at": options.seen})
                     elif options.type == "episodes" and options.seen and myid[1] and myid[2]:
-                        data.append({'ids':{options.format : myid[0]}, 
-                            "seasons": [ { "number": int(myid[1]), "episodes" : 
-                            [ { "number": int(myid[2]), "watched_at": options.seen} ] } ] })
+                        if options.seen == 'csv_flag':
+                            try:
+                                datetime.datetime.strptime(myid[3], '%Y-%m-%dT%H:%M:%S.000Z')
+                            except:
+                                sys.exit("Error, invalid format, it's must be UTC datetime, eg: '2016-01-01T00:00:00.000Z'")
+                            data.append({
+                                'ids':{options.format : myid[0]},
+                                "seasons": [ { "number": int(myid[1]), "episodes" : [ { "number": int(myid[2]),
+                                    "watched_at": myid[3]} ] } ] })
+                        else:
+                            data.append({
+                                'ids':{options.format : myid[0]},
+                                "seasons": [ { "number": int(myid[1]), "episodes" : [ { "number": int(myid[2]),
+                                    "watched_at": options.seen} ] } ] })
                     else:
                         data.append({'ids':{options.format : myid[0]}})
                     # Import batch of 10 IDs
@@ -413,7 +435,7 @@ def main():
             sys.exit(0)
 
         print "Overall imported {sent} {type}, results added:{added}, existing:{existing}, not_found:{not_found}".format(
-                sent=results['sentids'], type=options.type, added=results['added'], 
+                sent=results['sentids'], type=options.type, added=results['added'],
                 existing=results['existing'], not_found=results['not_found'])
 
 if __name__ == '__main__':
